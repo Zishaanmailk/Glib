@@ -6,7 +6,7 @@ x = np.array([x for x in range(0,101)])
 y = np.array([1 if i > 49 else 0 for i in x])
 #y = y * y  # squaring step
 
-def LogesticReg(x,y,iter=150,lern=0.001,lamda = 0.95,c=-1, m=0,plot='False'):
+def LogesticReg(x,y,iter=150,lern=0.001,lamda = 3,c=-1, m=0.01,plot='False'):
 
    import matplotlib.pyplot as plt
    import numpy as np

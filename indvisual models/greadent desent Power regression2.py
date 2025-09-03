@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 data=pd.read_csv("data2")
 x=np.array(data['x'])
 y=np.array(data['y'])
-y=y**(2)
+y=y**(3)
 
-def PowerReg(x,y,iter=100,lern=0.0000001,c=0, m=0,p=1,plot='False'):
+def PowerReg(x,y,iter=1000,lern=0.0000000001,c=0, m=0,p=1,plot='False'):
 
     import matplotlib.pyplot as plt
     import numpy as np

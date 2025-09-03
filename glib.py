@@ -1,197 +1,654 @@
-import pandas
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
+import math
+
+class LinearReg:
+    def __init__(self, iter=100, lern=0.00001, c=0, plot='False', track=False):
+        # store hyperparameters inside the object
+        self.iter = iter
+        self.lern = lern
+        self.c = c
+        self.plot_mode = plot
+        self.track = track
+
+        # model parameters (will be set after fit)
+        self.m = None
+        self.fitted = False
+
+    def fit(self, x, y):
+        if not isinstance(x, np.ndarray):
+            x = np.array(x)
+
+        n_samples, n_features = x.shape
+        self.m = np.zeros((1, n_features))  # initialize weights
+
+        # initial plot setup
+        self._plot(x, y, yp=None, set_plot=True)
+
+        for i in range(self.iter):
+            yp = (self.m @ x.T).flatten() + self.c  # prediction
+
+            # update weights
+            for j in range(n_features):
+                md = -(2 / n_samples) * np.sum(x[:, j] * (y - yp))
+                self.m[0, j] -= self.lern * md
+            cd = -(2 / n_samples) * np.sum(y - yp)
+            self.c -= self.lern * cd
+
+            # calculate loss
+            mse = np.mean((y - yp) ** 2)
+
+            if self.track:
+                print(f"iter={i} c={self.c:.5f} m={self.m} cost={mse:.5f}")
+
+            # update plots dynamically
+            self._plot(x, y, yp=yp, set_plot=False)
+
+        self.fitted = True
+
+    def predict(self, xt):
+        if not self.fitted:
+            raise ValueError("Model not fitted yet! Call .fit(x, y) first.")
+        ypp = (self.m @ xt.T).flatten() + self.c
+        return ypp
+
+    def _plot(self, x, y, yp=None, set_plot=True):
+        n_samples, n_features = x.shape
+
+        if set_plot==True and self.plot_mode != False:
+            if self.plot_mode == '*':
+                cols = int(math.ceil(np.sqrt(n_features + 2)))
+                rows = int(math.ceil((n_features + 2) / cols))
+                self.fig, self.axes = plt.subplots(rows, cols, figsize=(15.2, 9.4))
+                self.axes = np.array(self.axes).reshape(-1)
+
+                # point size scaling
+                def size(P, S_max=15, S_min=0.1):
+                    return max(S_min, min(S_max, S_max / P))
+
+                S = size(n_samples)
+
+                for j in range(n_features):
+                    self.axes[j].scatter(x[:, j], y, c="blue", s=S, label="actual points")
+                    self.axes[j].set_title(f"Feature {j + 1} vs y")
+
+                self.axes[n_features].scatter(range(len(y)), y, c="blue", s=S, label="actual points")
+                self.axes[n_features].set_title("Features vs y")
+
+                self.axes[n_features + 1].scatter(range(len(y)), y, c="blue", s=S, label="actual points")
+                self.axes[n_features + 1].set_title("yp vs y")
+
+                plt.tight_layout()
+
+            if self.plot_mode == True:
+                self.fig, self.axes = plt.subplots(1, 2, figsize=(15.3, 7.8))
+                self.axes = np.array(self.axes).reshape(-1)
+
+                self.axes[0].scatter(range(len(y)), y, c="blue", s=5, label="actual points")
+                self.axes[0].set_title("Features vs y")
+
+                self.axes[1].scatter(range(len(y)), y, c="blue", s=5, label="actual points")
+                self.axes[1].set_title("yp vs y")
+
+                plt.tight_layout()
+
+        if set_plot == False and self.plot_mode != False:
+            if self.plot_mode == '*':
+                for j in range(n_features):
+                    self.axes[j].cla()
+                    self.axes[j].scatter(x[:, j], y, c="blue", s=5)
+                    self.axes[j].plot(x[:, j], self.m[0, j] * x[:, j] + self.c, c="red")
+                    self.axes[j].set_title(f"Feature {j + 1} vs y")
+
+                self.axes[n_features].cla()
+                self.axes[n_features].scatter(range(len(y)), y, c="blue", s=5)
+                for k in range(n_features):
+                    self.axes[n_features].plot(x[:, k], self.m[0, k] * x[:, k] + self.c, label=f"f{k + 1}")
+                self.axes[n_features].legend()
+
+                self.axes[n_features + 1].cla()
+                self.axes[n_features + 1].scatter(range(len(y)), y, c="blue", s=5)
+                self.axes[n_features + 1].plot(range(len(y)), yp, c="g")
+                self.axes[n_features + 1].set_title("y vs yp")
+
+                plt.pause(0.0001)
+
+            if self.plot_mode == True:
+                self.axes[0].cla()
+                self.axes[0].scatter(range(len(y)), y, c="blue", s=5)
+                for k in range(n_features):
+                    self.axes[0].plot(x[:, k], self.m[0, k] * x[:, k] + self.c, label=f"f{k + 1}")
+                self.axes[0].legend()
+
+                self.axes[1].cla()
+                self.axes[1].scatter(range(len(y)), y, c="blue", s=5)
+                self.axes[1].plot(range(len(y)), yp, c="g")
+                self.axes[1].set_title("y vs yp")
+
+                plt.pause(0.0001)
+
+        if self.plot_mode != 'False':
+            plt.show(block=False)
 
 
-#linearregression model
-def LinearReg(x,y,iter=100,lern=0.00001,c=0, m=0,plot='False'):
+class Lasso:
+    def __init__(self, iter=100, lern=0.00001,lamda=0.00001, c=0, plot='False', track=False):
+        # store hyperparameters inside the object
+        self.iter = iter
+        self.lamda= lamda
+        self.lern = lern
+        self.c = c
+        self.plot_mode = plot
+        self.track = track
 
-    n = len(x)
+        # model parameters (will be set after fit)
+        self.m = None
+        self.fitted = False
 
-    if plot != 'False':
-        fig, (right, left) = plt.subplots(1, 2, figsize=(13, 6.5))
-        right.scatter(x, y, c="blue", label="actual points")
-        right.set_title("Gradient Descent trace")
-        right.set_xlabel("Feature")
-        right.set_ylabel("Dependent value")
-        plt.tight_layout()
+    def fit(self, x, y):
+        if not isinstance(x, np.ndarray):
+            x = np.array(x)
 
-    for i in range(iter):
-        yperr = (m * x) + c
+        n_samples, n_features = x.shape
+        self.m = np.zeros((1, n_features))  # initialize weights
 
-        # partial differentation of MSE
-        md = -(2 / n) * sum(x * (y - yperr))
-        cd = -(2 / n) * sum(y - yperr)
-        mse = np.mean((y - yperr) ** 2)
-        m -= lern * md
-        c -= lern * cd
+        # initial plot setup
+        self._plot(x, y, yp=None, set_plot=True)
 
-        if plot != 'False':
-            print(f"c= {c} m= {m} itter= {i} cost= {mse}")
-            left.cla()
-            right.plot(x, yperr, c="red")
-            left.scatter(x, y, c="blue", label="actual points")
-            left.plot(x, yperr, c="red", label="predicted line")
-            left.set_title("Gradient Descent live")
-            left.set_xlabel("Feature")
-            plt.pause(0.01)
-            left.legend()
+        for i in range(self.iter):
+            yp = (self.m @ x.T).flatten() + self.c  # prediction
 
-    if plot != 'False':
-        right.legend()
-        plt.show()
+            # update weights
+            for j in range(n_features):
+                md = -(2 / n_samples) * np.sum(x[:, j] * (y - yp)) + (self.lamda * abs(self.m[:, j]))
+                self.m[0, j] -= self.lern * md
+            cd = -(2 / n_samples) * np.sum(y - yp)
+            self.c -= self.lern * cd
 
+            # calculate loss
+            mse = np.mean((y - yp) ** 2)
 
-#lassoregression model
-def Lasso(x,y,iter=100,lern=0.00001,lamda = 0.02,c=0, m=0,plot='False'):
+            if self.track:
+                print(f"iter={i} c={self.c:.5f} m={self.m} cost={mse:.5f}")
 
-   n = len(x)
+            # update plots dynamically
+            self._plot(x, y, yp=yp, set_plot=False)
 
-   if plot != 'False':
-       fig, (right, left) = plt.subplots(1, 2, figsize=(13, 6.5))
-       right.scatter(x, y, c="blue", label="actual points")
-       right.set_title("Gradient Descent trace")
-       right.set_xlabel("Feature")
-       right.set_ylabel("Dependent value")
-       plt.tight_layout()
+        self.fitted = True
 
-   for i in range(iter):
-       yperr=(m*x)+c
-       #partial differentation of MSE
-       md=-(2/n)*sum(x*(y-yperr))+ (lamda * abs(m))
-       cd=-(2/n)*sum(y-yperr)
-       mse =np.mean((y - yperr)**2)
-       m-=lern*md
-       c-=lern*cd
+    def predict(self, xt):
+        if not self.fitted:
+            raise ValueError("Model not fitted yet! Call .fit(x, y) first.")
+        ypp = (self.m @ xt.T).flatten() + self.c
+        return ypp
 
-       if plot!='False':
-           print(f"c= {c} m= {m} itter= {i} cost= {mse}")
-           left.cla()
-           right.plot(x, yperr, c="red")
-           left.scatter(x, y, c="blue", label="actual points")
-           left.plot(x, yperr, c="red", label="predicted line")
-           left.set_title("Gradient Descent live")
-           left.set_xlabel("Feature")
-           plt.pause(0.01)
-           left.legend()
+    def _plot(self, x, y, yp=None, set_plot=True):
+        n_samples, n_features = x.shape
 
-   if plot != 'False':
-       right.legend()
-       plt.show()
+        if set_plot==True and self.plot_mode != False:
+            if self.plot_mode == '*':
+                cols = int(math.ceil(np.sqrt(n_features + 2)))
+                rows = int(math.ceil((n_features + 2) / cols))
+                self.fig, self.axes = plt.subplots(rows, cols, figsize=(15.2, 9.4))
+                self.axes = np.array(self.axes).reshape(-1)
 
+                # point size scaling
+                def size(P, S_max=15, S_min=0.1):
+                    return max(S_min, min(S_max, S_max / P))
 
-#logesticregression model
-def LogesticReg(x,y,iter=100,lern=0.001,lamda = 0.9,c=-1, m=0,plot='False'):
+                S = size(n_samples)
 
-   n = len(x)
+                for j in range(n_features):
+                    self.axes[j].scatter(x[:, j], y, c="blue", s=S, label="actual points")
+                    self.axes[j].set_title(f"Feature {j + 1} vs y")
 
-   if plot != 'False':
-       fig, (right, left) = plt.subplots(1, 2, figsize=(13, 6.5))
-       right.scatter(x, y, c="blue", label="actual points")
-       right.set_title("Gradient Descent trace")
-       right.set_xlabel("Feature")
-       right.set_ylabel("Dependent value")
-       plt.tight_layout()
+                self.axes[n_features].scatter(range(len(y)), y, c="blue", s=S, label="actual points")
+                self.axes[n_features].set_title("Features vs y")
 
-   for i in range(iter):
-       yperr=1/(1+np.exp((-m*x)-c))
-       #partial differentation of MSE
-       md=-(2/n)*sum(((1/yperr)**-2)*(y-yperr)*(x*np.exp((-m*x)-c)))
-       cd=-(2/n)*sum(((1/yperr)**-2)*(y-yperr)*(np.exp((-m*x)-c)))
-       mse =np.mean((y - yperr)**2)
-       m-=lern*md
-       c-=lamda*cd
+                self.axes[n_features + 1].scatter(range(len(y)), y, c="blue", s=S, label="actual points")
+                self.axes[n_features + 1].set_title("yp vs y")
 
-       if plot != 'False':
-           print(f"c= {c} m= {m} itter= {i} cost= {mse}")
-           left.cla()
-           right.plot(x, yperr, c="red")
-           left.scatter(x, y, c="blue", label="actual points")
-           left.plot(x, yperr, c="red", label="predicted line")
-           left.set_title("Gradient Descent live")
-           left.set_xlabel("Feature")
-           plt.pause(0.01)
-           left.legend()
+                plt.tight_layout()
 
-   if plot != 'False':
-       right.legend()
-       plt.show()
+            if self.plot_mode == True:
+                self.fig, self.axes = plt.subplots(1, 2, figsize=(15.3, 7.8))
+                self.axes = np.array(self.axes).reshape(-1)
 
+                self.axes[0].scatter(range(len(y)), y, c="blue", s=5, label="actual points")
+                self.axes[0].set_title("Features vs y")
 
-#powerregression model
-def PowerReg(x,y,iter=100,lern=0.0000001,c=0, m=0,p=1,plot='False'):
+                self.axes[1].scatter(range(len(y)), y, c="blue", s=5, label="actual points")
+                self.axes[1].set_title("yp vs y")
 
-    n = len(x)
+                plt.tight_layout()
 
-    if plot != 'False':
-        fig, (right, left) = plt.subplots(1, 2, figsize=(13, 6.5))
-        right.scatter(x, y, c="blue", label="actual points")
-        right.set_title("Gradient Descent trace")
-        right.set_xlabel("Feature")
-        right.set_ylabel("Dependent value")
-        plt.tight_layout()
+        if set_plot == False and self.plot_mode != False:
+            if self.plot_mode == '*':
+                for j in range(n_features):
+                    self.axes[j].cla()
+                    self.axes[j].scatter(x[:, j], y, c="blue", s=5)
+                    self.axes[j].plot(x[:, j], self.m[0, j] * x[:, j] + self.c, c="red")
+                    self.axes[j].set_title(f"Feature {j + 1} vs y")
 
+                self.axes[n_features].cla()
+                self.axes[n_features].scatter(range(len(y)), y, c="blue", s=5)
+                for k in range(n_features):
+                    self.axes[n_features].plot(x[:, k], self.m[0, k] * x[:, k] + self.c, label=f"f{k + 1}")
+                self.axes[n_features].legend()
 
-    for i in range(iter):
-       yperr = (m * (x ** p)) + c
-       # partial differentation of MSE
-       mse = np.mean((y - yperr) ** 2)
-       md = -(2 / n) * sum(x * (y - yperr))
-       cd = -(2 / n) * sum(y - yperr)
-       pdd = -(2 / n) * sum(m * p * x * (y - yperr))
-       m -= lern * md
-       c -= lern * cd
-       p -= lern * pdd
+                self.axes[n_features + 1].cla()
+                self.axes[n_features + 1].scatter(range(len(y)), y, c="blue", s=5)
+                self.axes[n_features + 1].plot(range(len(y)), yp, c="g")
+                self.axes[n_features + 1].set_title("y vs yp")
 
-       if plot != 'False':
-           print(f"c= {c} m= {m} p= {p} itter= {i} cost= {mse}")
-           left.cla()
-           right.plot(x, yperr, c="red")
-           left.scatter(x, y, c="blue", label="actual points")
-           left.plot(x, yperr, c="red", label="predicted line")
-           left.set_title("Gradient Descent live")
-           left.set_xlabel("Feature")
-           plt.pause(0.01)
-           left.legend()
+                plt.pause(0.0001)
 
-    if plot != 'False':
-        right.legend()
-        plt.show()
+            if self.plot_mode == True:
+                self.axes[0].cla()
+                self.axes[0].scatter(range(len(y)), y, c="blue", s=5)
+                for k in range(n_features):
+                    self.axes[0].plot(x[:, k], self.m[0, k] * x[:, k] + self.c, label=f"f{k + 1}")
+                self.axes[0].legend()
+
+                self.axes[1].cla()
+                self.axes[1].scatter(range(len(y)), y, c="blue", s=5)
+                self.axes[1].plot(range(len(y)), yp, c="g")
+                self.axes[1].set_title("y vs yp")
+
+                plt.pause(0.0001)
+
+        if self.plot_mode != 'False':
+            plt.show(block=False)
 
 
-#ridgeregression model
-def Ridge(x,y,iter=100,lern=0.00001,lamda = 0.02,c=0, m=0,plot='False'):
+class Ridge:
+    def __init__(self, iter=100, lern=0.00001,lamda=0.00001, c=0, plot='False', track=False):
+        # store hyperparameters inside the object
+        self.iter = iter
+        self.lamda= lamda
+        self.lern = lern
+        self.c = c
+        self.plot_mode = plot
+        self.track = track
 
-   n = len(x)
+        # model parameters (will be set after fit)
+        self.m = None
+        self.fitted = False
 
-   if plot != 'False':
-       fig, (right, left) = plt.subplots(1, 2, figsize=(13, 6.5))
-       right.scatter(x, y, c="blue", label="actual points")
-       right.set_title("Gradient Descent trace")
-       right.set_xlabel("Feature")
-       right.set_ylabel("Dependent value")
-       plt.tight_layout()
+    def fit(self, x, y):
+        if not isinstance(x, np.ndarray):
+            x = np.array(x)
 
-   for i in range(iter):
-       yperr=(m*x)+c
-       #partial differentation of MSE
-       md=-(2/n)*sum(x*(y-yperr))+ (lamda * m * m)
-       cd=-(2/n)*sum(y-yperr)
-       mse =np.mean((y - yperr)**2)
-       m-=lern*md
-       c-=lern*cd
+        n_samples, n_features = x.shape
+        self.m = np.zeros((1, n_features))  # initialize weights
 
-       if plot!='False':
-           print(f"c= {c} m= {m} itter= {i} cost= {mse}")
-           left.cla()
-           right.plot(x, yperr, c="red")
-           left.scatter(x, y, c="blue", label="actual points")
-           left.plot(x, yperr, c="red", label="predicted line")
-           left.set_title("Gradient Descent live")
-           left.set_xlabel("Feature")
-           plt.pause(0.01)
-           left.legend()
+        # initial plot setup
+        self._plot(x, y, yp=None, set_plot=True)
 
-   if plot != 'False':
-       right.legend()
-       plt.show()
+        for i in range(self.iter):
+            yp = (self.m @ x.T).flatten() + self.c  # prediction
+
+            # update weights
+            for j in range(n_features):
+                md = -(2/n_samples)*np.sum(x[:, j] * (y-yp))+ (self.lamda * self.m[0,j] *self. m[0,j])
+                self.m[0, j] -= self.lern * md
+            cd = -(2 / n_samples) * np.sum(y - yp)
+            self.c -= self.lern * cd
+
+            # calculate loss
+            mse = np.mean((y - yp) ** 2)
+
+            if self.track:
+                print(f"iter={i} c={self.c:.5f} m={self.m} cost={mse:.5f}")
+
+            # update plots dynamically
+            self._plot(x, y, yp=yp, set_plot=False)
+
+        self.fitted = True
+
+    def predict(self, xt):
+        if not self.fitted:
+            raise ValueError("Model not fitted yet! Call .fit(x, y) first.")
+        ypp = (self.m @ xt.T).flatten() + self.c
+        return ypp
+
+    def _plot(self, x, y, yp=None, set_plot=True):
+        n_samples, n_features = x.shape
+
+        if set_plot==True and self.plot_mode != False:
+            if self.plot_mode == '*':
+                cols = int(math.ceil(np.sqrt(n_features + 2)))
+                rows = int(math.ceil((n_features + 2) / cols))
+                self.fig, self.axes = plt.subplots(rows, cols, figsize=(15.2, 9.4))
+                self.axes = np.array(self.axes).reshape(-1)
+
+                # point size scaling
+                def size(P, S_max=15, S_min=0.1):
+                    return max(S_min, min(S_max, S_max / P))
+
+                S = size(n_samples)
+
+                for j in range(n_features):
+                    self.axes[j].scatter(x[:, j], y, c="blue", s=S, label="actual points")
+                    self.axes[j].set_title(f"Feature {j + 1} vs y")
+
+                self.axes[n_features].scatter(range(len(y)), y, c="blue", s=S, label="actual points")
+                self.axes[n_features].set_title("Features vs y")
+
+                self.axes[n_features + 1].scatter(range(len(y)), y, c="blue", s=S, label="actual points")
+                self.axes[n_features + 1].set_title("yp vs y")
+
+                plt.tight_layout()
+
+            if self.plot_mode == True:
+                self.fig, self.axes = plt.subplots(1, 2, figsize=(15.3, 7.8))
+                self.axes = np.array(self.axes).reshape(-1)
+
+                self.axes[0].scatter(range(len(y)), y, c="blue", s=5, label="actual points")
+                self.axes[0].set_title("Features vs y")
+
+                self.axes[1].scatter(range(len(y)), y, c="blue", s=5, label="actual points")
+                self.axes[1].set_title("yp vs y")
+
+                plt.tight_layout()
+
+        if set_plot == False and self.plot_mode != False:
+            if self.plot_mode == '*':
+                for j in range(n_features):
+                    self.axes[j].cla()
+                    self.axes[j].scatter(x[:, j], y, c="blue", s=5)
+                    self.axes[j].plot(x[:, j], self.m[0, j] * x[:, j] + self.c, c="red")
+                    self.axes[j].set_title(f"Feature {j + 1} vs y")
+
+                self.axes[n_features].cla()
+                self.axes[n_features].scatter(range(len(y)), y, c="blue", s=5)
+                for k in range(n_features):
+                    self.axes[n_features].plot(x[:, k], self.m[0, k] * x[:, k] + self.c, label=f"f{k + 1}")
+                self.axes[n_features].legend()
+
+                self.axes[n_features + 1].cla()
+                self.axes[n_features + 1].scatter(range(len(y)), y, c="blue", s=5)
+                self.axes[n_features + 1].plot(range(len(y)), yp, c="g")
+                self.axes[n_features + 1].set_title("y vs yp")
+
+                plt.pause(0.0001)
+
+            if self.plot_mode == True:
+                self.axes[0].cla()
+                self.axes[0].scatter(range(len(y)), y, c="blue", s=5)
+                for k in range(n_features):
+                    self.axes[0].plot(x[:, k], self.m[0, k] * x[:, k] + self.c, label=f"f{k + 1}")
+                self.axes[0].legend()
+
+                self.axes[1].cla()
+                self.axes[1].scatter(range(len(y)), y, c="blue", s=5)
+                self.axes[1].plot(range(len(y)), yp, c="g")
+                self.axes[1].set_title("y vs yp")
+
+                plt.pause(0.0001)
+
+        if self.plot_mode != 'False':
+            plt.show(block=False)
+
+
+class PowerReg:
+    def __init__(self, iter=100, lern=0.00001, c=0, plot='False', track=False):
+        # store hyperparameters inside the object
+        self.iter = iter
+        self.lern = lern
+        self.c = c
+        self.plot_mode = plot
+        self.track = track
+
+        # model parameters (will be set after fit)
+        self.m = None
+        self.p = None
+        self.fitted = False
+
+    def fit(self, x, y):
+        if not isinstance(x, np.ndarray):
+            x = np.array(x)
+
+        n_samples, n_features = x.shape
+        self.m = np.zeros((1, n_features))  # initialize weights
+        self.p = np.ones((1, n_features))   # initialize powers
+
+        # initial plot setup
+        self._plot(x, y, yp=None, set_plot=True)
+
+        for i in range(self.iter):
+            yp = (self.m.flatten() * (x ** self.p.flatten())).sum(axis=1) + self.c  # prediction
+
+            # update weights
+            for j in range(n_features):
+                md = -(2/n_samples)*np.sum(x[:, j] * (y-yp))
+                self.m[0, j] -= self.lern * md
+                pd = -(2 / n_samples) * np.sum((y - yp) * (self.m[0, j] * (x[:, j] ** self.p[0, j]) * np.log(x[:, j])))
+                self.p[0, j] -= self.lern * pd
+            cd = -(2 / n_samples) * np.sum(y - yp)
+            self.c -= self.lern * cd
+
+            # calculate loss
+            mse = np.mean((y - yp) ** 2)
+
+            if self.track:
+                print(f"iter={i} c={self.c:.5f} m={self.m} cost={mse:.5f}")
+
+            # update plots dynamically
+            self._plot(x, y, yp=yp, set_plot=False)
+
+        self.fitted = True
+
+    def predict(self, xt):
+        if not self.fitted:
+            raise ValueError("Model not fitted yet! Call .fit(x, y) first.")
+        ypp = (self.m @ xt.T).flatten() + self.c
+        return ypp
+
+    def _plot(self, x, y, yp=None, set_plot=True):
+        n_samples, n_features = x.shape
+
+        if set_plot==True and self.plot_mode != False:
+            if self.plot_mode == '*':
+                cols = int(math.ceil(np.sqrt(n_features + 2)))
+                rows = int(math.ceil((n_features + 2) / cols))
+                self.fig, self.axes = plt.subplots(rows, cols, figsize=(15.2, 9.4))
+                self.axes = np.array(self.axes).reshape(-1)
+
+                # point size scaling
+                def size(P, S_max=15, S_min=0.1):
+                    return max(S_min, min(S_max, S_max / P))
+
+                S = size(n_samples)
+
+                for j in range(n_features):
+                    self.axes[j].scatter(x[:, j], y, c="blue", s=S, label="actual points")
+                    self.axes[j].set_title(f"Feature {j + 1} vs y")
+
+                self.axes[n_features].scatter(range(len(y)), y, c="blue", s=S, label="actual points")
+                self.axes[n_features].set_title("Features vs y")
+
+                self.axes[n_features + 1].scatter(range(len(y)), y, c="blue", s=S, label="actual points")
+                self.axes[n_features + 1].set_title("yp vs y")
+
+                plt.tight_layout()
+
+            if self.plot_mode == True:
+                self.fig, self.axes = plt.subplots(1, 2, figsize=(15.3, 7.8))
+                self.axes = np.array(self.axes).reshape(-1)
+
+                self.axes[0].scatter(range(len(y)), y, c="blue", s=5, label="actual points")
+                self.axes[0].set_title("Features vs y")
+
+                self.axes[1].scatter(range(len(y)), y, c="blue", s=5, label="actual points")
+                self.axes[1].set_title("yp vs y")
+
+                plt.tight_layout()
+
+        if set_plot == False and self.plot_mode != False:
+            if self.plot_mode == '*':
+                for j in range(n_features):
+                    self.axes[j].cla()
+                    self.axes[j].scatter(x[:, j], y, c="blue", s=5)
+                    self.axes[j].plot(x[:, j], (self.m[0, j]*(x[:, j]**self.p[0,j]))+self.c, c="red")
+                    self.axes[j].set_title(f"Feature {j + 1} vs y")
+
+                self.axes[n_features].cla()
+                self.axes[n_features].scatter(range(len(y)), y, c="blue", s=5)
+                for k in range(n_features):
+                    self.axes[n_features].plot(x[:, k], (self.m[0, k]*(x[:, k]**self.p[0,k]))+self.c, label=f"f{k + 1}")
+                self.axes[n_features].legend()
+
+                self.axes[n_features + 1].cla()
+                self.axes[n_features + 1].scatter(range(len(y)), y, c="blue", s=5)
+                self.axes[n_features + 1].plot(range(len(y)), yp, c="g")
+                self.axes[n_features + 1].set_title("y vs yp")
+
+                plt.pause(0.0001)
+
+            if self.plot_mode == True:
+                self.axes[0].cla()
+                self.axes[0].scatter(range(len(y)), y, c="blue", s=5)
+                for k in range(n_features):
+                    self.axes[0].plot(x[:, k], (self.m[0, k]*(x[:, k]**self.p[0,k]))+self.c, label=f"f{k + 1}")
+                self.axes[0].legend()
+
+                self.axes[1].cla()
+                self.axes[1].scatter(range(len(y)), y, c="blue", s=5)
+                self.axes[1].plot(range(len(y)), yp, c="g")
+                self.axes[1].set_title("y vs yp")
+
+                plt.pause(0.0001)
+
+        if self.plot_mode != 'False':
+            plt.show(block=False)
+
+
+class LogesticReg:
+    def __init__(self, iter=100, lern=0.0001,lamda=7.5, c=0, plot='False', track=False):
+        # store hyperparameters inside the object
+        self.iter = iter
+        self.lamda= lamda
+        self.lern = lern
+        self.c = c
+        self.plot_mode = plot
+        self.track = track
+
+        # model parameters (will be set after fit)
+        self.m = None
+        self.fitted = False
+
+    def fit(self, x, y):
+        if not isinstance(x, np.ndarray):
+            x = np.array(x)
+
+        n_samples, n_features = x.shape
+        self.m = np.zeros((1, n_features))  # initialize weights
+
+        # initial plot setup
+        self._plot(x, y, yp=None, set_plot=True)
+
+        for i in range(self.iter):
+            yp = 1 / (1 + np.exp((-self.m @ x.T).flatten() - self.c))  # prediction
+
+            # update weights
+            for j in range(n_features):
+                md = -(2 / n_samples) * sum(((1 / yp) ** -2) * (y - yp) * (x[:, j] * np.exp((-self.m[:, j] * x[:, j]) - self.c)))
+                self.m[0, j] -= self.lern * md
+            cd = -(2 / n_samples) * sum(((1 / yp) ** -2) * (y - yp) * (np.exp(-(self.m @ x.T).flatten()) - self.c))
+            self.c -= self.lamda * cd
+
+            # calculate loss
+            mse = np.mean((y - yp) ** 2)
+
+            if self.track:
+                print(f"iter={i} c={self.c:.5f} m={self.m} cost={mse:.5f}")
+
+            # update plots dynamically
+            self._plot(x, y, yp=yp, set_plot=False)
+
+        self.fitted = True
+
+    def predict(self, xt):
+        if not self.fitted:
+            raise ValueError("Model not fitted yet! Call .fit(x, y) first.")
+        ypp = (self.m @ xt.T).flatten() + self.c
+        return ypp
+
+    def _plot(self, x, y, yp=None, set_plot=True):
+        n_samples, n_features = x.shape
+
+        if set_plot==True and self.plot_mode != False:
+            if self.plot_mode == '*':
+                cols = int(math.ceil(np.sqrt(n_features + 2)))
+                rows = int(math.ceil((n_features + 2) / cols))
+                self.fig, self.axes = plt.subplots(rows, cols, figsize=(15.2, 9.4))
+                self.axes = np.array(self.axes).reshape(-1)
+
+                # point size scaling
+                def size(P, S_max=15, S_min=0.1):
+                    return max(S_min, min(S_max, S_max / P))
+
+                S = size(n_samples)
+
+                for j in range(n_features):
+                    self.axes[j].scatter(x[:, j], y, c="blue", s=S, label="actual points")
+                    self.axes[j].set_title(f"Feature {j + 1} vs y")
+
+                self.axes[n_features].scatter(range(len(y)), y, c="blue", s=S, label="actual points")
+                self.axes[n_features].set_title("Features vs y")
+
+                self.axes[n_features + 1].scatter(range(len(y)), y, c="blue", s=S, label="actual points")
+                self.axes[n_features + 1].set_title("yp vs y")
+
+                plt.tight_layout()
+
+            if self.plot_mode == True:
+                self.fig, self.axes = plt.subplots(1, 2, figsize=(15.3, 7.8))
+                self.axes = np.array(self.axes).reshape(-1)
+
+                self.axes[0].scatter(range(len(y)), y, c="blue", s=5, label="actual points")
+                self.axes[0].set_title("Features vs y")
+
+                self.axes[1].scatter(range(len(y)), y, c="blue", s=5, label="actual points")
+                self.axes[1].set_title("yp vs y")
+
+                plt.tight_layout()
+
+        if set_plot == False and self.plot_mode != False:
+            if self.plot_mode == '*':
+                for j in range(n_features):
+                    self.axes[j].cla()
+                    self.axes[j].scatter(x[:, j], y, c="blue", s=5)
+                    self.axes[j].plot(x[:, j], 1/(1+np.exp((-self.m[:,j]*x[:,j])-self.c)), c="red")
+                    self.axes[j].set_title(f"Feature {j + 1} vs y")
+
+                self.axes[n_features].cla()
+                self.axes[n_features].scatter(range(len(y)), y, c="blue", s=5)
+                for k in range(n_features):
+                    self.axes[n_features].plot(x[:, k], 1/(1+np.exp((-self.m[:,k]*x[:,k])-self.c)), label=f"f{k + 1}")
+                self.axes[n_features].legend()
+
+                self.axes[n_features + 1].cla()
+                self.axes[n_features + 1].scatter(range(len(y)), y, c="blue", s=5)
+                self.axes[n_features + 1].plot(range(len(y)), yp, c="g")
+                self.axes[n_features + 1].set_title("y vs yp")
+
+                plt.pause(0.0001)
+
+            if self.plot_mode == True:
+                self.axes[0].cla()
+                self.axes[0].scatter(range(len(y)), y, c="blue", s=5)
+                for k in range(n_features):
+                    self.axes[0].plot(x[:, k], 1/(1+np.exp((-self.m[:,k]*x[:,k])-self.c)), label=f"f{k + 1}")
+                self.axes[0].legend()
+
+                self.axes[1].cla()
+                self.axes[1].scatter(range(len(y)), y, c="blue", s=5)
+                self.axes[1].plot(range(len(y)), yp, c="g")
+                self.axes[1].set_title("y vs yp")
+
+                plt.pause(0.0001)
+
+        if self.plot_mode != 'False':
+            plt.show(block=False)
